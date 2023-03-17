@@ -8,6 +8,12 @@ import java.nio.channels.FileChannel;
 public class Main {
 
     static String terrariaPath = System.getProperty("user.home") + "\\Documents\\My Games\\Terraria";
+    static String playersPath = terrariaPath + "\\Players\\";
+    static String worldsPath = terrariaPath + "\\Worlds\\";
+    static String worldsBackupPath = terrariaPath + "\\WorldsBackup\\";
+    static String playersBackupPath = terrariaPath + "\\PlayersBackup\\";
+
+
     public static String[] append(String[] stringArray, String newString){
         String[] arrayBuffer = new String[stringArray.length+1];
         for (int i = 0; i < stringArray.length; i++){
@@ -18,9 +24,9 @@ public class Main {
     }
 
 
-    public static String[] GetPlayers(){
+    public static String[] GetPlayers(String searchPath){
 
-        File folder = new File(terrariaPath + "\\Players");
+        File folder = new File(searchPath);
 
         File[] tempArray = folder.listFiles();
 
@@ -35,9 +41,9 @@ public class Main {
 
         return playerStrings;
     }
-    public static String[] GetWorlds(){
+    public static String[] GetWorlds(String searchPath){
 
-        File folder = new File(terrariaPath + "\\Worlds");
+        File folder = new File(searchPath);
 
         File[] tempArray = folder.listFiles();
 
@@ -53,67 +59,102 @@ public class Main {
         return worldStrings;
     }
 
-    public static void BackupData(String dataName) throws IOException
+    public static void LoadData(String dataName, boolean isBackup) throws IOException
     {
-        System.out.println("Backing up data: " + dataName);
+
+        boolean isPlayerData;
 
         String subDataName = dataName.substring(0, dataName.length()-4);
 
+        if (dataName.endsWith(".plr")){isPlayerData = true;}
+        else if (dataName.endsWith(".wld")){isPlayerData = false;}
+        else{return;}
+
         FileChannel saveFile = null;
-        FileChannel backupFile = null;
+        FileChannel targetFile = null;
 
-        String dataPath = null;
-        String backupDataPath = null;
+        FileChannel inputFile = null;
+        FileChannel outputFile = null;
 
-        File playerFolderFile = null;
 
-        if (dataName.endsWith(".wld")){
-            dataPath = terrariaPath + "\\Worlds\\" + dataName;
-            backupDataPath = terrariaPath + "\\WorldsBackup\\" + dataName;
-            new File(backupDataPath).createNewFile();
+        String dataPath;
+        String targetPath;
+
+        //Calculates the right directories
+        if (isBackup){
+            if(isPlayerData){
+                dataPath = playersPath + dataName;
+                targetPath = playersBackupPath + dataName;
+
+            }else {
+                dataPath = worldsPath + dataName;
+                targetPath = worldsBackupPath + dataName;
+            }
+        }else{
+            if(isPlayerData){
+                dataPath = playersBackupPath + dataName;
+                targetPath = playersPath + dataName;
+
+            }else {
+                dataPath = worldsBackupPath + dataName;
+                targetPath = worldsPath + dataName;
+            }
         }
-        if (dataName.endsWith(".plr")){
-            dataPath = terrariaPath + "\\Players\\" + dataName;
-            backupDataPath = terrariaPath + "\\PlayersBackup\\" + dataName;
-            new File(backupDataPath).createNewFile();
-            playerFolderFile = new File(terrariaPath + "\\Players\\" + subDataName);
-        }
 
-        if(dataPath == null){return;}
+        if (dataPath == null){return;}
 
         try{
             saveFile = new FileInputStream(dataPath).getChannel();
-            backupFile = new FileOutputStream(backupDataPath).getChannel();
+            targetFile = new FileOutputStream(targetPath).getChannel();
 
-            backupFile.transferFrom(saveFile, 0, saveFile.size());
+            targetFile.transferFrom(saveFile, 0, saveFile.size());
 
-            if (playerFolderFile != null){
-                new File(terrariaPath + "\\PlayersBackup\\" + subDataName).mkdir();
-                File[] folderFiles = playerFolderFile.listFiles();
-                for (int i = 0; i < folderFiles.length; i++){
-                    if(folderFiles[i].isFile()){
-                        FileChannel inputFile = new FileInputStream(folderFiles[i].getAbsolutePath()).getChannel();
-                        FileChannel outputFile = new FileOutputStream(terrariaPath + "\\PlayersBackup\\" + subDataName + "\\" +folderFiles[i].getName()).getChannel();
+            if (isPlayerData) {
+                if (isBackup) {
+                    new File(playersBackupPath + subDataName).mkdir();
+                    File playerFolderFile = new File(playersPath + subDataName + "\\");
+                    File[] folderFiles = playerFolderFile.listFiles();
+                    if (folderFiles == null){return;}
+                    for (int i = 0; i < folderFiles.length; i++) {
+                        if (folderFiles[i].isFile()) {
+                            inputFile = new FileInputStream(folderFiles[i].getAbsolutePath()).getChannel();
+                            outputFile = new FileOutputStream(playersBackupPath + subDataName + "\\" + folderFiles[i].getName()).getChannel();
 
-                        outputFile.transferFrom(inputFile, 0, inputFile.size());
+                            outputFile.transferFrom(inputFile, 0, inputFile.size());
 
+                        }
                     }
 
+                } else {
+                    new File(playersPath + subDataName).mkdir();
+                    File playerFolderFile = new File(playersBackupPath + subDataName + "\\");
+                    File[] folderFiles = playerFolderFile.listFiles();
+                    if (folderFiles == null){return;}
+                    for (int i = 0; i < folderFiles.length; i++) {
+                        if (folderFiles[i].isFile()) {
+                            inputFile = new FileInputStream(folderFiles[i].getAbsolutePath()).getChannel();
+                            outputFile = new FileOutputStream(playersPath + subDataName + "\\" + folderFiles[i].getName()).getChannel();
 
+                            outputFile.transferFrom(inputFile, 0, inputFile.size());
+                        }
+
+
+                    }
                 }
-
-
             }
 
-            JOptionPane.showMessageDialog(null, dataName + " backed up successfully.");
 
+            JOptionPane.showMessageDialog(null, "Operation was executed successfully");
+
+        }finally {
+            assert saveFile != null;
+            saveFile.close();
+            assert targetFile != null;
+            targetFile.close();
+            if (outputFile != null){outputFile.close();}
+            if (inputFile != null){inputFile.close();}
         }
-        finally {
 
-            if(saveFile != null){saveFile.close();}
-            if(backupFile != null){backupFile.close();}
-
-        }
 
     }
 
@@ -131,24 +172,35 @@ public class Main {
 
         //certifies that the backup folders exists.
 
-        new File(terrariaPath + "\\WorldsBackup").mkdir();
-        new File(terrariaPath + "\\PlayersBackup").mkdir();
+        new File(worldsBackupPath).mkdir();
+        new File(playersBackupPath).mkdir();
 
 
-        String[] worlds = GetWorlds();
-        String[] players = GetPlayers();
-
-        String[][] fetchedData = {worlds, players};
 
         while(true) {
-            int backupType = Integer.parseInt(JOptionPane.showInputDialog("1. Backup Worlds\n2. Backup Players")) - 1;
+
+            int operationType = Integer.parseInt(JOptionPane.showInputDialog("1. Backup\n2. Restore")) - 1;
+
+            int backupType = -1;
+            boolean isBackup;
+            String[][] fetchedData;
+
+            if (operationType == 0) {
+                backupType = Integer.parseInt(JOptionPane.showInputDialog("1. Backup Worlds\n2. Backup Players")) - 1;
+                fetchedData = new String[][]{GetWorlds(worldsPath), GetPlayers(playersPath)};
+                isBackup = true;
+            }else if (operationType == 1){
+                backupType = Integer.parseInt(JOptionPane.showInputDialog("1. Restore Worlds\n2. Restore Players")) - 1;
+                fetchedData = new String[][]{GetWorlds(worldsBackupPath), GetPlayers(playersBackupPath)};
+                isBackup = false;
+            }else{return;}
 
             if (backupType < 0 || backupType >= fetchedData.length){return;}
 
             int backupInput = Integer.parseInt(JOptionPane.showInputDialog(GetPromptString(fetchedData[backupType]))) - 1;
 
             if (backupInput >= 0 && backupInput < fetchedData[backupType].length) {
-                BackupData(fetchedData[backupType][backupInput]);
+                LoadData(fetchedData[backupType][backupInput], isBackup);
             }else{
                 return;
             }
